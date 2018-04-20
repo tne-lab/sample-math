@@ -1,6 +1,8 @@
 # Sample Math Plugin
 Plugin for the Open Ephys GUI to perform simple samplewise arithmetic (addition, subtraction, multiplication, division) on continuous channels. Each operation's second argument can be either a constant or another channel.
 
+![Sample Math with constant](sm_const.png) ![Sample Math with channel](sm_chan.png)
+
 ## Installing:
 
 * All platforms: Copy contents of "Source" into a new folder in your "Source/Plugins" called "SampleMath".
