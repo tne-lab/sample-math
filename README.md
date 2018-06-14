@@ -1,5 +1,5 @@
 # Sample Math Plugin
-Plugin for the Open Ephys GUI to perform simple samplewise arithmetic (addition, subtraction, multiplication, division) on continuous channels. Each operation's second argument can be either a constant or another channel.
+Plugin for the Open Ephys GUI to perform simple samplewise arithmetic (addition, subtraction, multiplication, division, summation and averaging) on continuous channels. For binary operations, the second argument can be either a constant or another channel.
 
 ![Sample Math with constant](sm_const.png) ![Sample Math with channel](sm_chan.png)
 
@@ -12,8 +12,8 @@ Plugin for the Open Ephys GUI to perform simple samplewise arithmetic (addition,
 
 ## Usage:
 
-* Top row: select which operation to perform on each processed input channel.
-* Middle row: select whether to add/subtract/multiply by/divide by a constant or another channel.
+* Top row: select which operation to perform on each processed input channel. The first four operations transform selected channels according to the second operand as selected below, whereas "SUM" and "MEAN" output the sum or mean of all selected channels on each selected channel.
+* Middle row: select whether the second operand is constant or another channel.
 * Bottom row: select that constant or channel.
 * Channels can be included/excluded from processing by selecting/deselecting them in the "Param" section of the drawer. NOTE however that if a channel is selected as the second argument of the operation, only channels from the same source node and subprocessor may be included for processing. This is to ensure that the channels input to an operation always have the same number of samples per buffer (the plugin does not do any resampling).
 
