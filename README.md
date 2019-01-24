@@ -1,4 +1,5 @@
-# Sample Math Plugin
+# Sample Math Plugin [![DOI](https://zenodo.org/badge/130402352.svg)](https://zenodo.org/badge/latestdoi/130402352)
+
 Plugin for the Open Ephys GUI to perform simple samplewise arithmetic (addition, subtraction, multiplication, division, summation and averaging) on continuous channels. For binary operations, the second argument can be either a constant or another channel.
 
 ![Sample Math with constant](sm_const.png) ![Sample Math with channel](sm_chan.png)
