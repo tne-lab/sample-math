@@ -48,7 +48,8 @@ enum Operation
     MULTIPLY,
     DIVIDE,
     SUM,
-    MEAN
+    MEAN,
+    VECTOR_SUM
 };
 
 class SampleMath : public GenericProcessor

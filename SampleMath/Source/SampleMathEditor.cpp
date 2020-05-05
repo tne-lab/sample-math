@@ -41,6 +41,7 @@ SampleMathEditor::SampleMathEditor(GenericProcessor* parentNode, bool useDefault
     operationBox->addItem(L"\u00f7", DIVIDE);
     operationBox->addItem("SUM", SUM);
     operationBox->addItem("MEAN", MEAN);
+    operationBox->addItem("VECTOR SUM", VECTOR_SUM);
     operationBox->setSelectedId(processor->operation, dontSendNotification);
     operationBox->setJustificationType(Justification::centred);
     int width = 60;

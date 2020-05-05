@@ -91,6 +91,16 @@ void SampleMath::process(AudioSampleBuffer& continuousBuffer)
                     1.0f / numActiveChannels, numValues);
                 break;
 
+            case VECTOR_SUM:
+                FloatVectorOperations::addWithMultiply(resultPtr, sourcePtr,
+                    sourcePtr, numValues);
+                //FloatVectorOperations::
+                
+                for (int i = 0; i < numValues; ++i)
+                {
+                    resultPtr[i] = std::sqrt(resultPtr[i]);
+                }
+
             default:
                 jassertfalse;
                 break;
@@ -159,9 +169,10 @@ void SampleMath::process(AudioSampleBuffer& continuousBuffer)
 
         case SUM:
         case MEAN:
+        case VECTOR_SUM:
             FloatVectorOperations::copy(wp, naryResult.getRawDataPointer(), numValues);
             break;
-
+        
         default: 
             jassertfalse;
             break;
@@ -293,5 +304,5 @@ juce::uint32 SampleMath::chanToFullID(int chanNum) const
 
 bool SampleMath::opIsBinary(Operation op)
 {
-    return !(op == SUM || op == MEAN);
+    return !(op == SUM || op == MEAN || op == VECTOR_SUM);
 }
