@@ -27,49 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <EditorHeaders.h>
 #include "SampleMath.h"
 
-class SampleMathEditor : public GenericEditor, public ComboBox::Listener, public Label::Listener
+class SampleMathEditor : public GenericEditor
 {
 public:
-    SampleMathEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors = false);
+    SampleMathEditor(GenericProcessor* parentNode);
     ~SampleMathEditor();
 
-    // implements ComboBox::Listener
-    void comboBoxChanged(ComboBox* comboBoxThatHasChanged) override;
-
-    // implements Label::Listener
-    void labelTextChanged(Label* labelThatHasChanged) override;
-
-    // keep channel selector valid
-    void updateSettings() override;
-
-    // catch invalid channel selections
-    void channelChanged(int chan, bool newState) override;
-
-    // hide irrelevant control when re-expanded
-    void collapsedStateChanged() override;
-
-    void saveCustomParameters(XmlElement* xml) override;
-    void loadCustomParameters(XmlElement* xml) override;
+    void updateParameterVisibility(Mode mode);
 
 private:
-    /*
-    * Ouputs whether the label contained a valid input; if so, it is stored in *out
-    * and the label is updated with the parsed input. Otherwise, the label is reset
-    * to defaultValue.
-    */
-    static bool updateFloatLabel(Label* label, float min, float max,
-        float defaultValue, float* out);
-
-    // UI elements
-    ScopedPointer<ComboBox> operationBox;
-
-    ScopedPointer<Component> operandSection;
-    ScopedPointer<ComboBox> useChannelBox;
-    ScopedPointer<ComboBox> channelSelectionBox;
-    ScopedPointer<Label> constantEditable;
-
-    const String CHANNEL_SELECT_TOOLTIP = "Note: Can only be applied to channels from the same source/subprocessor.";
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SampleMathEditor);
 };
 

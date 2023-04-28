@@ -25,215 +25,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string> // stof
 #include <cfloat> // limits
 
-SampleMathEditor::SampleMathEditor(GenericProcessor* parentNode, bool useDefaultParameterEditors)
-    : GenericEditor(parentNode, useDefaultParameterEditors)
+SampleMathEditor::SampleMathEditor(GenericProcessor* parentNode)
+    : GenericEditor(parentNode)
 {
-    desiredWidth = 100;
-    SampleMath* processor = static_cast<SampleMath*>(parentNode);
+    desiredWidth = 200;
 
-    int xCenter = desiredWidth / 2 - 5; // account for drawer button
-    int yPos = 35;
+    addComboBoxParameterEditor("Operation", 10, 20);
+    addComboBoxParameterEditor("Mode", 100, 20);
+    addTextBoxParameterEditor("Constant", 10, 70);
+    addSelectedChannelsParameterEditor("Channel", 10, 70);
 
-    operationBox = new ComboBox("operation");
-    operationBox->addItem("+", ADD);
-    operationBox->addItem(L"\u2212", SUBTRACT);
-    operationBox->addItem(L"\u00d7", MULTIPLY);
-    operationBox->addItem(L"\u00f7", DIVIDE);
-    operationBox->addItem("SUM", SUM);
-    operationBox->addItem("MEAN", MEAN);
-    operationBox->addItem("VECTOR SUM", VECTOR_SUM);
-    operationBox->setSelectedId(processor->operation, dontSendNotification);
-    operationBox->setJustificationType(Justification::centred);
-    int width = 60;
-    operationBox->setBounds(xCenter - width / 2, yPos, width, 20);
-    operationBox->addListener(this);
-    addAndMakeVisible(operationBox);
-
-    yPos += 30;
-    const int EDITOR_HT = 120;
-    operandSection = new Component;
-    operandSection->setBounds(0, yPos, desiredWidth, EDITOR_HT - yPos);
-    operandSection->setVisible(SampleMath::opIsBinary(processor->operation));
-    addChildComponent(operandSection);
-
-    yPos = 0;
-    useChannelBox = new ComboBox("useChannel");
-    useChannelBox->addItem("CONST", 1);
-    useChannelBox->addItem("CHAN", 2);
-    useChannelBox->setSelectedId(processor->useChannel ? 2 : 1, dontSendNotification);
-    width = 70;
-    useChannelBox->setBounds(xCenter - width / 2, yPos, width, 20);
-    useChannelBox->addListener(this);
-    operandSection->addAndMakeVisible(useChannelBox);
-
-    channelSelectionBox = new ComboBox("channelSelection");
-    width = 50;
-    channelSelectionBox->setBounds(xCenter - width / 2, yPos += 30, width, 20);
-    channelSelectionBox->addListener(this);
-    channelSelectionBox->setTooltip(CHANNEL_SELECT_TOOLTIP);
-    channelSelectionBox->setVisible(processor->useChannel);
-    operandSection->addChildComponent(channelSelectionBox);
-
-    constantEditable = new Label("constantE");
-    constantEditable->setEditable(true);
-    width = 60;
-    constantEditable->setBounds(xCenter - width / 2, yPos, width, 20);
-    constantEditable->setText(String(processor->constant), dontSendNotification);
-    constantEditable->setColour(Label::backgroundColourId, Colours::grey);
-    constantEditable->setColour(Label::textColourId, Colours::white);
-    constantEditable->addListener(this);
-    constantEditable->setVisible(!channelSelectionBox->isVisible());
-    operandSection->addChildComponent(constantEditable);
+    Mode mode = Mode((int) getProcessor()->getParameter("Mode")->getValue());
+    updateParameterVisibility(mode);
 }
 
 SampleMathEditor::~SampleMathEditor() {}
 
-void SampleMathEditor::comboBoxChanged(ComboBox* comboBoxThatHasChanged)
-{
-    SampleMath* processor = static_cast<SampleMath*>(getProcessor());
-    if (comboBoxThatHasChanged == operationBox)
-    {
-        int selectedOp = operationBox->getSelectedId();
-        processor->setParameter(OPERATION, static_cast<float>(selectedOp));
-        operandSection->setVisible(SampleMath::opIsBinary(static_cast<Operation>(selectedOp)));
-    }
-    else if (comboBoxThatHasChanged == useChannelBox)
-    {
-        bool useChannel = static_cast<bool>(useChannelBox->getSelectedId() - 1);
-        if (useChannel)
-        {
-            constantEditable->setVisible(false);
-            channelSelectionBox->setVisible(true);
-        }
-        else
-        {
-            channelSelectionBox->setVisible(false);
-            constantEditable->setVisible(true);
-        }
-        processor->setParameter(USE_CHANNEL, static_cast<float>(useChannel));
-    }
-    else if (comboBoxThatHasChanged == channelSelectionBox)
-    {
-        processor->setParameter(CHANNEL, static_cast<float>(channelSelectionBox->getSelectedId() - 1));
-    }
-}
 
-void SampleMathEditor::labelTextChanged(Label* labelThatHasChanged)
+void SampleMathEditor::updateParameterVisibility(Mode mode)
 {
-    SampleMath* processor = static_cast<SampleMath*>(getProcessor());
-    if (labelThatHasChanged == constantEditable)
+    for (auto paramEditor : parameterEditors)
     {
-        float floatInput;
-        bool valid = updateFloatLabel(labelThatHasChanged, -FLT_MAX, FLT_MAX,
-            processor->constant, &floatInput);
-
-        if (valid)
+        if (paramEditor->getParameterName().equalsIgnoreCase("Constant"))
         {
-            processor->setParameter(CONSTANT, floatInput);
+            paramEditor->setVisible(mode == CONSTANT);
+        }
+        else if (paramEditor->getParameterName().equalsIgnoreCase("Channel"))
+        {
+            paramEditor->setVisible(mode == CHANNEL);
         }
     }
-}
-
-void SampleMathEditor::updateSettings()
-{
-    SampleMath* processor = static_cast<SampleMath*>(getProcessor());
-
-    // repopulate channel selection box
-    channelSelectionBox->clear();
-    int numChannels = processor->getNumInputs();
-    for (int i = 1; i <= numChannels; ++i)
-    {
-        channelSelectionBox->addItem(String(i), i);
-    }
-    
-    // update selected item
-    if (processor->selectedChannel >= 0)
-    {
-        channelSelectionBox->setSelectedId(processor->selectedChannel + 1, dontSendNotification);
-    }
-}
-
-void SampleMathEditor::channelChanged(int chan, bool newState)
-{
-    SampleMath* processor = static_cast<SampleMath*>(getProcessor());
-    if (newState == true && processor->useChannel)
-    {
-        bool subProcessorMismatch = processor->chanToFullID(chan) != processor->validSubProcFullID;
-        if (subProcessorMismatch)
-        {
-            // turn channel back off
-            CoreServices::sendStatusMessage("Cannot select this channel due to subprocessor mismatch");
-            bool p, r, a;
-            getChannelSelectionState(chan, &p, &r, &a);
-            setChannelSelectionState(chan - 1, false, r, a);
-        }
-    }
-}
-
-void SampleMathEditor::collapsedStateChanged()
-{
-    switch (useChannelBox->getSelectedId())
-    {
-    case 2:
-        constantEditable->setVisible(false);
-        break;
-
-    case 1:
-    default:
-        channelSelectionBox->setVisible(false);
-        break;
-    }
-}
-
-void SampleMathEditor::saveCustomParameters(XmlElement* xml)
-{
-    xml->setAttribute("Type", "SampleMath");
-
-    SampleMath* processor = static_cast<SampleMath*>(getProcessor());
-    XmlElement* paramValues = xml->createNewChildElement("VALUES");
-    paramValues->setAttribute("operation", processor->operation);
-    paramValues->setAttribute("useChannel", processor->useChannel);
-    paramValues->setAttribute("constant", processor->constant);
-    paramValues->setAttribute("selectedChannel", processor->selectedChannel + 1); // one-based!
-}
-
-void SampleMathEditor::loadCustomParameters(XmlElement* xml)
-{
-    forEachXmlChildElementWithTagName(*xml, xmlNode, "VALUES")
-    {
-        // select channel while useChannel is false to avoid unnecessarily inactivating channels
-        int selectedChannel = xmlNode->getIntAttribute("selectedChannel", channelSelectionBox->getSelectedId());
-        if (selectedChannel > 0 && selectedChannel <= channelSelectionBox->getNumItems())
-        {
-            channelSelectionBox->setSelectedId(selectedChannel, sendNotificationSync);
-        }
-
-        operationBox->setSelectedId(xmlNode->getIntAttribute("operation", operationBox->getSelectedId()), sendNotificationAsync);
-        constantEditable->setText(xmlNode->getStringAttribute("constant", constantEditable->getText()), sendNotificationAsync);
-        int useChannelIdx = 1 + xmlNode->getIntAttribute("useChannel", useChannelBox->getSelectedId() - 1);
-        useChannelBox->setSelectedId(useChannelIdx, sendNotificationAsync);
-    }
-}
-
-// static utility
-
-bool SampleMathEditor::updateFloatLabel(Label* label, float min, float max,
-    float defaultValue, float* out)
-{
-    const String& in = label->getText();
-    float parsedFloat;
-    try
-    {
-        parsedFloat = std::stof(in.toRawUTF8());
-    }
-    catch (const std::logic_error&)
-    {
-        label->setText(String(defaultValue), dontSendNotification);
-        return false;
-    }
-
-    *out = jmax(min, jmin(max, parsedFloat));
-
-    label->setText(String(*out), dontSendNotification);
-    return true;
 }

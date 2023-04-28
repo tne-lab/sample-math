@@ -26,280 +26,238 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 SampleMath::SampleMath()
     : GenericProcessor  ("Samp Math")
-    , operation         (ADD)
-    , useChannel        (false)
-    , constant          (0)
-    , selectedChannel   (-1)
 {
-    setProcessorType(PROCESSOR_TYPE_FILTER);
+   addCategoricalParameter(Parameter::STREAM_SCOPE, "Operation", "The operation to use", { "+",  L"\u2212", L"\u00d7", L"\u00f7", "SUM", "MEAN", "VECTOR SUM" }, 0);
+   addCategoricalParameter(Parameter::STREAM_SCOPE, "Mode", "Channel or constant", {"CONST", "CHAN"}, 0);
+   addFloatParameter(Parameter::STREAM_SCOPE, "Constant", "The constant to use", 0, 0, std::numeric_limits<float>::max(), .001);
+   addSelectedChannelsParameter(Parameter::STREAM_SCOPE, "Channel", "The continuous channel to use", 1);
 }
 
 SampleMath::~SampleMath() {}
 
 AudioProcessorEditor* SampleMath::createEditor()
 {
-    editor = new SampleMathEditor(this);
-    return editor;
+    editor = std::make_unique<SampleMathEditor>(this);
+    return editor.get();
 }
 
 void SampleMath::process(AudioSampleBuffer& continuousBuffer)
 {
-    Operation currOp = operation;
-    bool isBinary = opIsBinary(currOp);
-    int currSelectedChannel = selectedChannel;
-    bool reallyUseChannel = useChannel && isBinary;
-
-    const float* rp;
-    if (reallyUseChannel)
+    for (auto stream : getDataStreams())
     {
-        rp = continuousBuffer.getReadPointer(currSelectedChannel);
-    }
+        const uint16 streamId = stream->getStreamId();
+        const uint32 numValues = getNumSamplesInBlock(streamId);
 
-    // iterate over active channels
-    Array<int> activeChannels = editor->getActiveChannels();
-    int numActiveChannels = activeChannels.size();
-    bool selectedChannelIsActive = false;
+        // Extract parameters
+        SampleMathSettings* smSettings = settings[streamId];
+        Operation currOp = smSettings->operation;
+        int currSelectedChannel = smSettings->channel;
+        Mode currMode = smSettings->mode;
+        float constant = smSettings->constant;
 
-    int numValues;
-    if (numActiveChannels == 0)
-    {
-        return;
-    }
-    else
-    {
-        numValues = getNumSamples(activeChannels[0]);
-    }
+        bool isBinary = opIsBinary(currOp);
 
-    Array<float> naryResult;
-    if (!isBinary)
-    {
-        // pre-loop through channels to calculate n-ary function result over selected channels
-        naryResult.insertMultiple(0, 0.0f, numValues);
-        float* resultPtr = naryResult.getRawDataPointer();
+        
+        int numActiveChannels = continuousChannels.size();
 
-        for (int chan : activeChannels)
+        // Check that active channel is valid
+        bool isValidChannel = currSelectedChannel > -1 && currSelectedChannel < numActiveChannels;
+        bool useChannel = currMode == CHANNEL && isBinary && isValidChannel;
+
+        bool selectedChannelIsActive = false;
+
+        const float* rp;
+        if (useChannel)
         {
-            const float* sourcePtr = continuousBuffer.getReadPointer(chan);
+            rp = continuousBuffer.getReadPointer(currSelectedChannel);
+        }
+
+        Array<float> naryResult;
+        if (!isBinary)
+        {
+            // pre-loop through channels to calculate n-ary function result over selected channels
+            naryResult.insertMultiple(0, 0.0f, numValues);
+            float* resultPtr = naryResult.getRawDataPointer();
+
+            for (auto chan : continuousChannels)
+            {
+                /*const float* sourcePtr = continuousBuffer.getReadPointer(chan->getLocalIndex());*/
+                const float* sourcePtr = continuousBuffer.getReadPointer(chan->getGlobalIndex());
+                switch (currOp)
+                {
+                case SUM:
+                    FloatVectorOperations::add(resultPtr, sourcePtr, numValues);
+                    break;
+
+                case MEAN:
+                    FloatVectorOperations::addWithMultiply(resultPtr, sourcePtr,
+                        1.0f / numActiveChannels, numValues);
+                    break;
+
+                case VECTOR_SUM:
+                    FloatVectorOperations::addWithMultiply(resultPtr, sourcePtr,
+                        sourcePtr, numValues);
+
+                    for (int i = 0; i < numValues; ++i)
+                    {
+                        resultPtr[i] = std::sqrt(resultPtr[i]);
+                    }
+
+                default:
+                    jassertfalse;
+                    break;
+                }
+            }
+        }
+
+        for (auto chan : continuousChannels)
+        {
+            int index = chan->getLocalIndex();
+            if (useChannel && index == currSelectedChannel)
+            {
+                selectedChannelIsActive = true;
+                continue; // process separately at end
+            }
+
+            float* wp = continuousBuffer.getWritePointer(index);
+
             switch (currOp)
             {
-            case SUM:
-                FloatVectorOperations::add(resultPtr, sourcePtr, numValues);
-                break;
-
-            case MEAN:
-                FloatVectorOperations::addWithMultiply(resultPtr, sourcePtr,
-                    1.0f / numActiveChannels, numValues);
-                break;
-
-            case VECTOR_SUM:
-                FloatVectorOperations::addWithMultiply(resultPtr, sourcePtr,
-                    sourcePtr, numValues);
-                //FloatVectorOperations::
-                
-                for (int i = 0; i < numValues; ++i)
+            case ADD:
+                if (useChannel)
                 {
-                    resultPtr[i] = std::sqrt(resultPtr[i]);
+                    FloatVectorOperations::add(wp, rp, numValues);
                 }
+                else if (currMode == CONSTANT)
+                {
+                    FloatVectorOperations::add(wp, constant, numValues);
+                }
+                break;
+
+            case SUBTRACT:
+                if (useChannel)
+                {
+                    FloatVectorOperations::subtract(wp, rp, numValues);
+                }
+                else if (currMode == CONSTANT)
+                {
+                    FloatVectorOperations::add(wp, -constant, numValues);
+                }
+                break;
+
+            case MULTIPLY:
+                if (useChannel)
+                {
+                    FloatVectorOperations::multiply(wp, rp, numValues);
+                }
+                else if (currMode == CONSTANT)
+                {
+                    FloatVectorOperations::multiply(wp, constant, numValues);
+                }
+                break;
+
+            case DIVIDE:
+                if (useChannel)
+                {
+                    for (int i = 0; i < numValues; ++i)
+                    {
+                        wp[i] /= rp[i];
+                    }
+                }
+                else if (currMode == CONSTANT)
+                {
+                    FloatVectorOperations::multiply(wp, 1.0f / constant, numValues);
+                }
+                break;
+
+            case SUM:
+            case MEAN:
+            case VECTOR_SUM:
+                FloatVectorOperations::copy(wp, naryResult.getRawDataPointer(), numValues);
+                break;
 
             default:
                 jassertfalse;
                 break;
             }
         }
-    }
 
-    for (int chan : activeChannels)
-    {
-        if (reallyUseChannel && chan == currSelectedChannel)
+        if (selectedChannelIsActive)
         {
-            selectedChannelIsActive = true;
-            continue; // process separately at end
+            float* wp = continuousBuffer.getWritePointer(currSelectedChannel);
+
+            switch (currOp)
+            {
+            case ADD:
+                FloatVectorOperations::add(wp, wp, numValues);
+                break;
+
+            case SUBTRACT:
+                FloatVectorOperations::clear(wp, numValues);
+                break;
+
+            case MULTIPLY:
+                FloatVectorOperations::multiply(wp, wp, numValues);
+                break;
+
+            case DIVIDE:
+                FloatVectorOperations::fill(wp, 1.0f, numValues);
+            }
         }
-
-        float* wp = continuousBuffer.getWritePointer(chan);
-
-        switch (currOp)
-        {
-        case ADD:
-            if (reallyUseChannel)
-            {
-                FloatVectorOperations::add(wp, rp, numValues);
-            }
-            else
-            {
-                FloatVectorOperations::add(wp, constant, numValues);
-            }
-            break;
-
-        case SUBTRACT:
-            if (reallyUseChannel)
-            {
-                FloatVectorOperations::subtract(wp, rp, numValues);
-            }
-            else
-            {
-                FloatVectorOperations::add(wp, -constant, numValues);
-            }
-            break;
-
-        case MULTIPLY:
-            if (reallyUseChannel)
-            {
-                FloatVectorOperations::multiply(wp, rp, numValues);
-            }
-            else
-            {
-                FloatVectorOperations::multiply(wp, constant, numValues);
-            }
-            break;
-
-        case DIVIDE:
-            if (reallyUseChannel)
-            {
-                for (int i = 0; i < numValues; ++i)
-                {
-                    wp[i] /= rp[i];
-                }
-            }
-            else
-            {
-                FloatVectorOperations::multiply(wp, 1.0f / constant, numValues);
-            }
-            break;
-
-        case SUM:
-        case MEAN:
-        case VECTOR_SUM:
-            FloatVectorOperations::copy(wp, naryResult.getRawDataPointer(), numValues);
-            break;
-        
-        default: 
-            jassertfalse;
-            break;
-        }
-    }
-
-    if (selectedChannelIsActive)
-    {
-        int numValues = getNumSamples(currSelectedChannel);
-        float* wp = continuousBuffer.getWritePointer(currSelectedChannel);
-
-        switch (currOp)
-        {
-        case ADD:
-            FloatVectorOperations::add(wp, wp, numValues);
-            break;
-
-        case SUBTRACT:
-            FloatVectorOperations::clear(wp, numValues);
-            break;
-
-        case MULTIPLY:
-            FloatVectorOperations::multiply(wp, wp, numValues);
-            break;
-
-        case DIVIDE:
-            FloatVectorOperations::fill(wp, 1.0f, numValues);
-        }
-    }
-}
-
-void SampleMath::setParameter(int parameterIndex, float newValue)
-{
-    switch (parameterIndex)
-    {
-    case OPERATION:
-        operation = static_cast<Operation>(static_cast<int>(newValue));
-        break;
-
-    case USE_CHANNEL:
-        if (newValue)
-        {
-            validateActiveChannels();
-        }
-        useChannel = static_cast<bool>(newValue);
-        break;
-
-    case CONSTANT:
-        constant = newValue;
-        break;
-
-    case CHANNEL:
-        int newChanNum = static_cast<int>(newValue);
-        if (newChanNum == -1 || newChanNum >= getTotalDataChannels())
-        {
-            if (!CoreServices::getAcquisitionStatus())
-            {
-                selectedChannel = -1;
-            }
-            break;
-        }
-
-        validSubProcFullID = chanToFullID(newChanNum);
-        if (useChannel)
-        {
-            validateActiveChannels();
-        }
-        selectedChannel = newChanNum;
-        break;
     }
 }
 
 void SampleMath::updateSettings()
 {
-    // refresh selected channel, and if still valid, validate active channels if necessary
-    int numChannels = getNumInputs();
-    if (numChannels == 0)
-    {
-        selectedChannel = -1; // = none available
-        return;
-    }
-    
-    if (selectedChannel >= numChannels || selectedChannel == -1)
-    {
-        selectedChannel = 0; // reset to default
-    }
+    settings.update(getDataStreams());
 
-    validSubProcFullID = chanToFullID(selectedChannel);
-    if (useChannel)
+    for (auto stream : getDataStreams())
     {
-        validateActiveChannels();
+        // Update settings objects
+        parameterValueChanged(stream->getParameter("Operation"));
+        parameterValueChanged(stream->getParameter("Mode"));
+        parameterValueChanged(stream->getParameter("Constant"));
+        parameterValueChanged(stream->getParameter("Channel"));
     }
 }
 
-// private
 
-void SampleMath::validateActiveChannels()
+void SampleMath::parameterValueChanged(Parameter* param)
 {
-    Array<int> activeChannels = editor->getActiveChannels();
-    int numChannels = getNumInputs();
-    bool p, r, a, haveSentMessage = false;
-    const String message = "Deselecting channels that don't match subprocessor of selected reference";
-    for (int chan : activeChannels)
-    {
-        if (chan >= numChannels) // can happen during update if # of channels decreases
-        {
-            continue;
-        }
+    const uint16 streamId = param->getStreamId();
 
-        if (chanToFullID(chan) != validSubProcFullID)
+    if (param->getName().equalsIgnoreCase("Channel"))
+    {
+        Array<var>* array = param->getValue().getArray();
+
+        // Make sure there's a selected value
+        if (array->size() > 0)
         {
-            if (!haveSentMessage)
-            {
-                CoreServices::sendStatusMessage(message);
-            }
-            editor->getChannelSelectionState(chan, &p, &r, &a);
-            editor->setChannelSelectionState(chan - 1, false, r, a);
+            int localIndex = int(array->getFirst());
+            int globalIndex = getDataStream(param->getStreamId())->getContinuousChannels()[localIndex]->getGlobalIndex();
+            settings[streamId]->channel = globalIndex;
+        }
+        else
+        {
+            settings[streamId]->channel = -1;
         }
     }
-}
+    else if (param->getName().equalsIgnoreCase("Mode"))
+    {
+        Mode newMode = Mode((int)param->getValue());
+        settings[streamId]->mode = newMode;
 
-juce::uint32 SampleMath::chanToFullID(int chanNum) const
-{
-    const DataChannel* chan = getDataChannel(chanNum);
-    uint16 sourceNodeID = chan->getSourceNodeID();
-    uint16 subProcessorIdx = chan->getSubProcessorIdx();
-    return getProcessorFullId(sourceNodeID, subProcessorIdx);
+        ((SampleMathEditor*)getEditor())->updateParameterVisibility(newMode);
+    }
+    else if (param->getName().equalsIgnoreCase("Operation"))
+    {
+        Operation newOperation = Operation((int) param->getValue());
+        settings[streamId]->operation = newOperation;
+    }
+    else if (param->getName().equalsIgnoreCase("Constant"))
+    {
+        settings[streamId]->constant = (float) param->getValue();
+    }
 }
 
 bool SampleMath::opIsBinary(Operation op)

@@ -32,24 +32,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * @see GenericProcessor
  */
 
-enum Param
-{
-    OPERATION,
-    USE_CHANNEL,
-    CONSTANT,
-    CHANNEL
-};
-
 // corresponds to indices of ComboBox choices
 enum Operation
 {
-    ADD = 1,
+    ADD = 0,
     SUBTRACT,
     MULTIPLY,
     DIVIDE,
     SUM,
     MEAN,
     VECTOR_SUM
+};
+
+enum Mode
+{
+    CONSTANT = 0,
+    CHANNEL
+};
+
+
+class SampleMathSettings {
+public:
+    Operation operation;
+    float constant;
+    int channel;
+    Mode mode;
 };
 
 class SampleMath : public GenericProcessor
@@ -60,34 +67,18 @@ public:
     SampleMath();
     ~SampleMath();
 
-    bool hasEditor() const { return true; }
     AudioProcessorEditor* createEditor() override;
 
     void process(AudioSampleBuffer& continuousBuffer) override;
 
-    void setParameter(int parameterIndex, float newValue) override;
-
     void updateSettings() override;
 
+    void parameterValueChanged(Parameter* param) override;
+
 private:
-    /*
-    * Checks whether all active channels are from the same subprocessor as the selected one,
-    * if using the selected channel for the operation rather than a constant, and if not deselects
-    * those that do not match. Checks each channel against validSubProcFullId.
-    */
-    void validateActiveChannels();
-
-    // utilities
-    juce::uint32 chanToFullID(int chanNum) const;
-
     static bool opIsBinary(Operation op);
 
-    // parameters
-    Operation operation;
-    bool useChannel; // whether operator parameter is a constant or a channel
-    float constant;
-    int selectedChannel; // -1 = none available
-    juce::uint32 validSubProcFullID; // = subproccessor full ID of selected channel
+    StreamSettings<SampleMathSettings> settings;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SampleMath);
 };
