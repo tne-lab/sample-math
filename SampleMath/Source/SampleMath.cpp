@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "SampleMathEditor.h"
 
 SampleMath::SampleMath()
-    : GenericProcessor  ("Samp Math")
+    : GenericProcessor  ("Sample Math")
 {
    addCategoricalParameter(Parameter::STREAM_SCOPE, "Operation", "The operation to use", { "+",  L"\u2212", L"\u00d7", L"\u00f7", "SUM", "MEAN", "VECTOR SUM" }, 0);
    addCategoricalParameter(Parameter::STREAM_SCOPE, "Mode", "Channel or constant", {"CONST", "CHAN"}, 0);
