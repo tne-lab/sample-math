@@ -28,15 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 SampleMathEditor::SampleMathEditor(GenericProcessor* parentNode)
     : GenericEditor(parentNode)
 {
+    SampleMath* processor = static_cast<SampleMath*>(parentNode);
     desiredWidth = 200;
 
-    addComboBoxParameterEditor("Operation", 10, 20);
-    addComboBoxParameterEditor("Mode", 100, 20);
-    addTextBoxParameterEditor("Constant", 10, 70);
-    addSelectedChannelsParameterEditor("Channel", 10, 70);
+    addComboBoxParameterEditor(Parameter::STREAM_SCOPE, "Operation", 10, 30);
+    addComboBoxParameterEditor(Parameter::STREAM_SCOPE, "Mode", 10, 60);
+    addTextBoxParameterEditor(Parameter::STREAM_SCOPE, "Constant", 10, 90);
+    addSelectedChannelsParameterEditor(Parameter::STREAM_SCOPE, "Channel", 10, 90);
 
-    Mode mode = Mode((int) getProcessor()->getParameter("Mode")->getValue());
-    updateParameterVisibility(mode);
+  /*  Mode mode = Mode((int) processor->getParameter("Mode")->getValue());
+    updateParameterVisibility(mode);*/
 }
 
 SampleMathEditor::~SampleMathEditor() {}

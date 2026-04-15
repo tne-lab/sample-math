@@ -27,13 +27,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 SampleMath::SampleMath()
     : GenericProcessor  ("Sample Math")
 {
-   addCategoricalParameter(Parameter::STREAM_SCOPE, "Operation", "The operation to use", { "+",  L"\u2212", L"\u00d7", L"\u00f7", "SUM", "MEAN", "VECTOR SUM" }, 0);
-   addCategoricalParameter(Parameter::STREAM_SCOPE, "Mode", "Channel or constant", {"CONST", "CHAN"}, 0);
-   addFloatParameter(Parameter::STREAM_SCOPE, "Constant", "The constant to use", 0, 0, std::numeric_limits<float>::max(), .001);
-   addSelectedChannelsParameter(Parameter::STREAM_SCOPE, "Channel", "The continuous channel to use", 1);
+  
 }
 
 SampleMath::~SampleMath() {}
+
+void SampleMath::registerParameters()
+{
+   addCategoricalParameter(Parameter::STREAM_SCOPE, "Operation", "Operation", "The operation to use", { "+",  L"\u2212", L"\u00d7", L"\u00f7", "SUM", "MEAN", "VECTOR SUM" }, 0);
+   addCategoricalParameter(Parameter::STREAM_SCOPE, "Mode", "Mode", "Channel or constant", {"CONST", "CHAN"}, 0);
+   addFloatParameter(Parameter::STREAM_SCOPE, "Constant", "Constant", "The constant to use", "", 0, 0, std::numeric_limits<float>::max(), .001, false);
+   addSelectedChannelsParameter(Parameter::STREAM_SCOPE, "Channel", "Channel", "The continuous channel to use", 1);
+}
 
 AudioProcessorEditor* SampleMath::createEditor()
 {
@@ -86,17 +91,17 @@ void SampleMath::process(AudioSampleBuffer& continuousBuffer)
                 switch (currOp)
                 {
                 case SUM:
-                    FloatVectorOperations::add(resultPtr, sourcePtr, numValues);
+                    FloatVectorOperations::add(resultPtr, sourcePtr, static_cast<int>(numValues));
                     break;
 
                 case MEAN:
                     FloatVectorOperations::addWithMultiply(resultPtr, sourcePtr,
-                        1.0f / numActiveChannels, numValues);
+                        1.0f / numActiveChannels, static_cast<int>(numValues));
                     break;
 
                 case VECTOR_SUM:
                     FloatVectorOperations::addWithMultiply(resultPtr, sourcePtr,
-                        sourcePtr, numValues);
+                        sourcePtr, static_cast<int>(numValues));
 
                     for (int i = 0; i < numValues; ++i)
                     {
@@ -126,33 +131,33 @@ void SampleMath::process(AudioSampleBuffer& continuousBuffer)
             case ADD:
                 if (useChannel)
                 {
-                    FloatVectorOperations::add(wp, rp, numValues);
+                    FloatVectorOperations::add(wp, rp, static_cast<int>(numValues));
                 }
                 else if (currMode == CONSTANT)
                 {
-                    FloatVectorOperations::add(wp, constant, numValues);
+                    FloatVectorOperations::add(wp, constant, static_cast<int>(numValues));
                 }
                 break;
 
             case SUBTRACT:
                 if (useChannel)
                 {
-                    FloatVectorOperations::subtract(wp, rp, numValues);
+                    FloatVectorOperations::subtract(wp, rp, static_cast<int>(numValues));
                 }
                 else if (currMode == CONSTANT)
                 {
-                    FloatVectorOperations::add(wp, -constant, numValues);
+                    FloatVectorOperations::add(wp, -constant, static_cast<int>(numValues));
                 }
                 break;
 
             case MULTIPLY:
                 if (useChannel)
                 {
-                    FloatVectorOperations::multiply(wp, rp, numValues);
+                    FloatVectorOperations::multiply(wp, rp, static_cast<int>(numValues));
                 }
                 else if (currMode == CONSTANT)
                 {
-                    FloatVectorOperations::multiply(wp, constant, numValues);
+                    FloatVectorOperations::multiply(wp, constant, static_cast<int>(numValues));
                 }
                 break;
 
@@ -166,14 +171,14 @@ void SampleMath::process(AudioSampleBuffer& continuousBuffer)
                 }
                 else if (currMode == CONSTANT)
                 {
-                    FloatVectorOperations::multiply(wp, 1.0f / constant, numValues);
+                    FloatVectorOperations::multiply(wp, 1.0f / constant, static_cast<int>(numValues));
                 }
                 break;
 
             case SUM:
             case MEAN:
             case VECTOR_SUM:
-                FloatVectorOperations::copy(wp, naryResult.getRawDataPointer(), numValues);
+                FloatVectorOperations::copy(wp, naryResult.getRawDataPointer(), static_cast<int>(numValues));
                 break;
 
             default:
@@ -189,19 +194,19 @@ void SampleMath::process(AudioSampleBuffer& continuousBuffer)
             switch (currOp)
             {
             case ADD:
-                FloatVectorOperations::add(wp, wp, numValues);
+                FloatVectorOperations::add(wp, wp, static_cast<int>(numValues));
                 break;
 
             case SUBTRACT:
-                FloatVectorOperations::clear(wp, numValues);
+                FloatVectorOperations::clear(wp, static_cast<int>(numValues));
                 break;
 
             case MULTIPLY:
-                FloatVectorOperations::multiply(wp, wp, numValues);
+                FloatVectorOperations::multiply(wp, wp, static_cast<int>(numValues));
                 break;
 
             case DIVIDE:
-                FloatVectorOperations::fill(wp, 1.0f, numValues);
+                FloatVectorOperations::fill(wp, 1.0f, static_cast<int>(numValues));
             }
         }
     }

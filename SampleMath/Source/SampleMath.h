@@ -75,6 +75,8 @@ public:
 
     void parameterValueChanged(Parameter* param) override;
 
+    void registerParameters() override;
+
 private:
     static bool opIsBinary(Operation op);
 
